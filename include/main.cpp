@@ -24,16 +24,68 @@ int main() {
     SplitString(tokens, input, ' ');
     cout << tokens[0] << ' ';  // timestamp
     string& cmd = tokens[1];
-    if (cmd == "exit") {
-      cout << "bye\n";
-      break;
-    } else if (cmd == "clear") {
-      US.Clear();
-      TS.Clear();
-      KS.Clear();
-    } else if (cmd == "add_user") {
-      string item, curuser, user, password, name, mail;
-      int privilege;
+    if (cmd == "buy_ticket") {
+      string item, user, trainID, date, from, to, tp;
+      int num;
+      bool queue = false;
+      for (int i = 2; i < tokens.size(); i += 2) {
+        item = tokens[i];
+        switch (item[1]) {
+          case 'u':
+            user = tokens[i + 1];
+            break;
+          case 'i':
+            trainID = tokens[i + 1];
+            break;
+          case 'd':
+            date = tokens[i + 1];
+            break;
+          case 'n':
+            num = stoi(tokens[i + 1]);
+            break;
+          case 'f':
+            from = tokens[i + 1];
+            break;
+          case 't':
+            to = tokens[i + 1];
+            break;
+          case 'q':
+            tp = tokens[i + 1];
+            if (tp == "true")
+              queue = true;
+            else
+              queue = false;
+            break;
+        }
+      }
+      KS.BuyTicket(user, trainID, date, from, to, num, queue);
+    } else if (cmd == "query_ticket") {
+      string item, date, from, to, tp;
+      sjtu::SortType type;
+      for (int i = 2; i < tokens.size(); i += 2) {
+        item = tokens[i];
+        switch (item[1]) {
+          case 'd':
+            date = tokens[i + 1];
+            break;
+          case 's':
+            from = tokens[i + 1];
+            break;
+          case 't':
+            to = tokens[i + 1];
+            break;
+          case 'p':
+            tp = tokens[i + 1];
+            if (tp == "time")
+              type = sjtu::TIME;
+            else
+              type = sjtu::COST;
+            break;
+        }
+      }
+      KS.QueryTicket(from, to, date, type);
+    } else if (cmd == "query_profile") {
+      string item, curuser, user;
       for (int i = 2; i < tokens.size(); i += 2) {
         item = tokens[i];
         switch (item[1]) {
@@ -43,24 +95,12 @@ int main() {
           case 'u':
             user = tokens[i + 1];
             break;
-          case 'p':
-            password = tokens[i + 1];
-            break;
-          case 'n':
-            name = tokens[i + 1];
-            break;
-          case 'm':
-            mail = tokens[i + 1];
-            break;
-          case 'g':
-            privilege = stoi(tokens[i + 1]);
-            break;
           default:
             throw;
             break;
         }
       }
-      US.AddUser(curuser, user, password, name, mail, privilege);
+      US.QueryProfile(curuser, user);
     } else if (cmd == "login") {
       string item, user, password;
       for (int i = 2; i < tokens.size(); i += 2) {
@@ -81,23 +121,6 @@ int main() {
     } else if (cmd == "logout") {
       string curuser = tokens[3];
       US.Logout(curuser);
-    } else if (cmd == "query_profile") {
-      string item, curuser, user;
-      for (int i = 2; i < tokens.size(); i += 2) {
-        item = tokens[i];
-        switch (item[1]) {
-          case 'c':
-            curuser = tokens[i + 1];
-            break;
-          case 'u':
-            user = tokens[i + 1];
-            break;
-          default:
-            throw;
-            break;
-        }
-      }
-      US.QueryProfile(curuser, user);
     } else if (cmd == "modify_profile") {
       string item, curuser, user, password, name, mail;
       int privilege = -1;
@@ -128,6 +151,39 @@ int main() {
         }
       }
       US.ModifyProfile(curuser, user, password, name, mail, privilege);
+    } else if (cmd == "query_order") {
+      string user = tokens[3];
+      KS.QueryOrder(user);
+    } else if (cmd == "add_user") {
+      string item, curuser, user, password, name, mail;
+      int privilege;
+      for (int i = 2; i < tokens.size(); i += 2) {
+        item = tokens[i];
+        switch (item[1]) {
+          case 'c':
+            curuser = tokens[i + 1];
+            break;
+          case 'u':
+            user = tokens[i + 1];
+            break;
+          case 'p':
+            password = tokens[i + 1];
+            break;
+          case 'n':
+            name = tokens[i + 1];
+            break;
+          case 'm':
+            mail = tokens[i + 1];
+            break;
+          case 'g':
+            privilege = stoi(tokens[i + 1]);
+            break;
+          default:
+            throw;
+            break;
+        }
+      }
+      US.AddUser(curuser, user, password, name, mail, privilege);
     } else if (cmd == "add_train") {
       string item, trainID, stations, prices, starttime, traveltimes, stopovertimes, salesdate;
       int stationnum, seatnum;
@@ -192,32 +248,8 @@ int main() {
         }
       }
       TS.QueryTrain(trainID, date);
-    } else if (cmd == "query_ticket") {
-      string item, date, from, to, tp;
-      sjtu::SortType type;
-      for (int i = 2; i < tokens.size(); i += 2) {
-        item = tokens[i];
-        switch (item[1]) {
-          case 'd':
-            date = tokens[i + 1];
-            break;
-          case 's':
-            from = tokens[i + 1];
-            break;
-          case 't':
-            to = tokens[i + 1];
-            break;
-          case 'p':
-            tp = tokens[i + 1];
-            if (tp == "time")
-              type = sjtu::TIME;
-            else
-              type = sjtu::COST;
-            break;
-        }
-      }
-      KS.QueryTicket(from, to, date, type);
-    } else if (cmd == "query_transfer") {
+    }
+    else if (cmd == "query_transfer") {
       string item, date, from, to, tp;
       sjtu::SortType type;
       for (int i = 2; i < tokens.size(); i += 2) {
@@ -242,44 +274,6 @@ int main() {
         }
       }
       KS.QueryTransfer(from, to, date, type);
-    } else if (cmd == "buy_ticket") {
-      string item, user, trainID, date, from, to, tp;
-      int num;
-      bool queue = false;
-      for (int i = 2; i < tokens.size(); i += 2) {
-        item = tokens[i];
-        switch (item[1]) {
-          case 'u':
-            user = tokens[i + 1];
-            break;
-          case 'i':
-            trainID = tokens[i + 1];
-            break;
-          case 'd':
-            date = tokens[i + 1];
-            break;
-          case 'n':
-            num = stoi(tokens[i + 1]);
-            break;
-          case 'f':
-            from = tokens[i + 1];
-            break;
-          case 't':
-            to = tokens[i + 1];
-            break;
-          case 'q':
-            tp = tokens[i + 1];
-            if (tp == "true")
-              queue = true;
-            else
-              queue = false;
-            break;
-        }
-      }
-      KS.BuyTicket(user, trainID, date, from, to, num, queue);
-    } else if (cmd == "query_order") {
-      string user = tokens[3];
-      KS.QueryOrder(user);
     } else if (cmd == "refund_ticket") {
       string item, user;
       int num = 1;
@@ -295,6 +289,13 @@ int main() {
         }
       }
       KS.RefundTicket(user, num);
+    } else if (cmd == "clear") {
+      US.Clear();
+      TS.Clear();
+      KS.Clear();
+    } else if (cmd == "exit") {
+      cout << "bye\n";
+      break;
     } else
       throw;
   }
