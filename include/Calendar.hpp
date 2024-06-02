@@ -289,7 +289,11 @@ struct DateTime {
     return ret;
   }
   friend int operator-(const DateTime& lhs, const DateTime& rhs) {
-    return (lhs.date - rhs.date) * 1440 + (lhs.time - rhs.time);
+    int d = (lhs.date - rhs.date) * 1440;
+    int t = lhs.time - rhs.time;
+    if (lhs.time < rhs.time)
+      t *= -1;
+    return d + t;
   }
   friend std::ostream& operator<<(std::ostream& os, const DateTime& dt) {
     os << dt.date << ' ' << dt.time;
