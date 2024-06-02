@@ -26,6 +26,12 @@ struct DirectTravel {
   DirectTravel() = default;
   DirectTravel(ID trainID_, int compthing_, int pos_)
       : trainID(trainID_), compthing(compthing_), pos(pos_) {}
+  DirectTravel& operator=(const DirectTravel& other) {
+    trainID = other.trainID;
+    compthing = other.compthing;
+    pos = other.pos;
+    return *this;
+  }
 };
 bool comp1(const DirectTravel& lhs, const DirectTravel& rhs) {
   // 以compthing为第一关键字，trainID为第二关键字
