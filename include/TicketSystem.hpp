@@ -82,7 +82,7 @@ class TicketSystem {
   BPTree<int, int> orderIndex;                // 用户信息-订单存储位置
   BPTree<Element<int, int>, int> queueIndex;  // 车次编号-相对发车日的日期-订单存储位置
   std::fstream ofile;                         // 存储订单
-  const string& filename = "Data/ticketData.dat";
+  const string& filename = "ticketData.dat";
 
   vector<Element<int, int> > from;
   vector<Element<int, int> > to;
@@ -101,7 +101,7 @@ class TicketSystem {
   TrainSystem TS;
   UserSystem US;
   TicketSystem()
-      : orderIndex("Data/orderIndex.dat"), queueIndex("Data/queueIndex.dat") {
+      : orderIndex("orderIndex.dat"), queueIndex("queueIndex.dat") {
     ofile.open(filename, std::ios::in | std::ios::out | std::ios::binary);
     if (!ofile.is_open()) {
       ofile.open(filename, std::ios::out);
