@@ -13,8 +13,8 @@ using sjtu::SplitString;
 // 直接把parser写在这里算了
 
 int main() {
-  //freopen64("in.in", "r", stdin);
-  //freopen64("out.out", "w", stdout);
+  // freopen64("in.in", "r", stdin);
+  // freopen64("out.out", "w", stdout);
   std::ios::sync_with_stdio(false);
   cin.tie(nullptr);
   cout.tie(nullptr);
@@ -22,12 +22,6 @@ int main() {
   string input;
   while (getline(cin, input)) {
     SplitString(tokens, input, ' ');
-
-    if (tokens[0] == "[21589]")
-      cout << "";
-    if (tokens[0] == "[18220]")
-      cout << "";
-
     cout << tokens[0] << ' ';  // timestamp
     string& cmd = tokens[1];
     if (cmd == "exit") {
@@ -288,7 +282,7 @@ int main() {
       KS.QueryOrder(user);
     } else if (cmd == "refund_ticket") {
       string item, user;
-      int num;
+      int num = 1;
       for (int i = 2; i < tokens.size(); i += 2) {
         item = tokens[i];
         switch (item[1]) {
