@@ -59,7 +59,7 @@ class UserSystem {
   int siz;  // 用户总数
   int head = sizeof(int);
   BPTree<ID, int> index;  // 索引库，用户ID-文件指针
-  const string ufilename = "Data/UserData.dat";
+  const string ufilename = "UserData.dat";
   std::fstream ufile;                // 用户数据出入口，存真实数据
   map<ID, pair<int, int> > onlines;  // 当前在线，用户ID-privilege-文件指针
   User tmp;
@@ -76,7 +76,7 @@ class UserSystem {
 
  public:
   explicit UserSystem()
-      : index("Data/UserIndex.dat") {
+      : index("UserIndex.dat") {
     ufile.open(ufilename, std::ios::in | std::ios::out | std::ios::binary);
     if (!ufile.is_open()) {
       // 新建文件，此时siz一定是0
