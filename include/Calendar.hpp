@@ -166,6 +166,7 @@ struct Time {
     return *this;
   }
   Time& operator-=(const int& mm) {
+    minute += days * 1440, days = 0;
     minute -= mm;
     hour -= minute / 60;
     minute %= 60;
