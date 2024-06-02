@@ -189,23 +189,21 @@ void MergeSort(vector<T>& v, int l, int r, T* a, bool (*comp)(const T&, const T&
   int i = l, j = mid + 1, k = l;
   while (i <= mid && j <= r) {
     if (comp(v[i], v[j]))
-      a[k++] = a[i++];
+      a[k++] = v[i++];
     else
-      a[k++] = a[j++];
+      a[k++] = v[j++];
   }
   while (i <= mid)
     a[k++] = v[i++];
   while (j <= r)
     a[k++] = v[j++];
-  for (int i = l; i <= r; i++)
+  for (int i = l; i <= r; ++i)
     v[i] = a[i];
 }
 template <class T>
 void Sort(vector<T>& v, bool (*comp)(const T&, const T&) = std::less<T>()) {
   T* a = new T[v.size()];
-  for (int i = 0; i < v.size(); i++)
-    a[i] = v[i];
-  MergeSort(v, 0, v.size() - 1, a, comp);
+  MergeSort<T>(v, 0, v.size() - 1, a, comp);
   delete[] a;
 }
 
