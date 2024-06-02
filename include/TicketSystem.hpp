@@ -162,7 +162,6 @@ class TicketSystem {
           /*
           记录：trainID，始发时间dt，抵达时间dt，旅途消耗的时间，累计价格，最大座位数
           */
-
           timeprice[0].push_back(tr.arriveTimes[to[j].val] - tr.departTimes[from[i].val]);
           timeprice[1].push_back(tr.prices[to[j].val] - tr.prices[from[i].val]);
           int seats = 2147483647, deltaday = d - tr.salesDate[0] - tr.departTimes[from[i].val].days;
@@ -186,6 +185,7 @@ class TicketSystem {
       cout << "0\n";
       return false;
     }
+    int ppp = travel.size();
     // 排序，按照time或cost第一关键字，trainID第二关键字进行排序
     Sort(travel, comp1);  // 此时travel中的pos就是我们想要的
     cout << travel.size() << '\n';
@@ -216,9 +216,11 @@ class TicketSystem {
     Element<int, int> stationID[2];
     Date realDate[2];  // 最终输出日期
 
-    static Train tr1, tr2;
+    Train tr1, tr2;
     for (int i = 0; i < from.size(); ++i) {
       TS.ReadProfile(from[i].key, tr1);
+      if (from[i].val == tr1.stationNum - 1)
+        continue;  // 第一辆车的最后一站，有什么好坐的
       Date left = tr1.salesDate[0] + tr1.departTimes[from[i].val].days;
       Date right = tr1.salesDate[1] + tr1.departTimes[from[i].val].days;
       if (d < left || right < d)
@@ -227,14 +229,19 @@ class TicketSystem {
         if (from[i].key == to[j].key)
           continue;  // 一样的站就不要了
         TS.ReadProfile(to[j].key, tr2);
+
         // 开始检查共有车站，from往后找，to往前找
         for (int x = from[i].val; x < tr1.stationNum; ++x) {
           for (int y = 0; y < to[j].val; ++y) {
             if (tr1.stations[x] != tr2.stations[y])
               continue;  // 不一样的两站
-            DateTime fromcome(Date(d + tr1.arriveTimes[x].days - tr1.departTimes[from[i].val].days), Time(tr1.arriveTimes[x]) - tr1.arriveTimes[x].days);
+            // 这个共有车站不能是from和to
+            String stationName(from_.c_str());
+            if (tr1.stations[x] == stationName || tr2.stations[y] == stationName)
+              continue;
+            DateTime fromcome(Date(d + (tr1.arriveTimes[x].days - tr1.departTimes[from[i].val].days)), Time(tr1.arriveTimes[x]) - tr1.arriveTimes[x].days * 1440);
             // 1车在这个点到达这一站，2车最后一趟出发不能比他晚
-            DateTime togolast(tr2.salesDate[2], tr2.departTimes[y]);  // 2车最后一次发车
+            DateTime togolast(tr2.salesDate[1], tr2.departTimes[y]);  // 2车最后一次发车
             if (togolast < fromcome)
               continue;
             // 此时可用这趟车
@@ -250,8 +257,8 @@ class TicketSystem {
                 // 当天可走
                 curtime = (tr1.arriveTimes[x] - tr1.departTimes[from[i].val]) + (t2 - t1) + (tr2.arriveTimes[to[j].val] - tr2.departTimes[y]);
                 RealDate = fromcome.date - tr2.departTimes[y].days;  // 减去，因为后面再构造要输出的时间时会加上这个days
-              } else {
-                curtime = (tr1.arriveTimes[x] - tr1.departTimes[from[i].val]) + (t2 - t1) + (tr2.arriveTimes[to[j].val] - tr2.departTimes[y]) + 1440;
+              } else {                                               // 第二天走
+                curtime = (tr1.arriveTimes[x] - tr1.departTimes[from[i].val]) + (1440 - (t2 - t1)) + (tr2.arriveTimes[to[j].val] - tr2.departTimes[y]);
                 RealDate = fromcome.date - tr2.departTimes[y].days + 1;
               }  // RealDate计算貌似有一点问题
             } else {
@@ -318,7 +325,7 @@ class TicketSystem {
       cout << "-1\n";
       return false;
     }
-    static Train tr;
+    Train tr;
     TS.ReadProfile(res[0], tr);
     if (tr.released == 0) {
       cout << "-1\n";
@@ -336,8 +343,7 @@ class TicketSystem {
       cout << "-1\n";
       return false;
     }
-    static Date d;
-    d = dat;
+    Date d(dat);
     int deltaday = d - tr.salesDate[0] - tr.departTimes[From].days;
     if (deltaday < 0 || deltaday > tr.salesDate[1] - tr.salesDate[0]) {
       cout << "-1\n";
@@ -360,7 +366,7 @@ class TicketSystem {
       return false;
     }  // 没有余票，不想候补
 
-    static Order order;
+    Order order;
     order.userID = us.c_str();
     order.trainID = tn.c_str();
     order.trainpos = res[0];
@@ -392,7 +398,7 @@ class TicketSystem {
     orderIndex.Insert(Element<int, int>(userpos, siz));
     queueIndex.Insert(Element<Element<int, int>, int>(Element<int, int>(res[0], deltaday), siz));
     ofile.seekp(head + (siz++) * sizeof(Order));
-    ofile.write(reinterpret_cast<const char*>(&order), sizeof(Order));
+    ofile.write(reinterpret_cast<const char*>(&order), sizeof(order));
     cout << "queue\n";
     return true;
   }
@@ -444,37 +450,37 @@ class TicketSystem {
   在候补队列中查找对应的订单，将其删掉（时间戳也是唯一标识，可以直接找到的）
   */
   bool RefundTicket(const string& us, int pos) {
-    static ID userID;
-    userID = us.c_str();
+    ID userID(us.c_str());
     int userpos = US.Online(userID);
     if (userpos == -1) {
       cout << "-1\n";
       return false;
     }
     orderIndex.Find(userpos, res);
-    if (res.size() < pos) {
+    if ((int)res.size() < pos) {
       // 不足
       cout << "-1\n";
       return false;
     }
     int p = res.size() - pos;
     int prepos = res[p];
-    static Order order;
+    Order order;
     ofile.seekg(head + prepos * sizeof(Order));
     ofile.read(reinterpret_cast<char*>(&order), sizeof(order));
     if (order.status == REFUNDED) {
       cout << "-1\n";
       return false;
     }
-    order.status = REFUNDED;
     if (order.status == QUEUE) {
       // 从候补队列中去掉
+      order.status = REFUNDED;
       queueIndex.Remove(Element<Element<int, int>, int>(Element<int, int>(order.trainpos, order.deltaday), prepos));
       ofile.seekp(head + prepos * sizeof(Order));
       ofile.write(reinterpret_cast<const char*>(&(order.status)), sizeof(order.status));
       cout << "0\n";
       return true;
     }
+    order.status = REFUNDED;
     // 已经买了票，要修改train的数据
     static Train tr;
     TS.ReadProfile(order.trainpos, tr);
@@ -487,7 +493,7 @@ class TicketSystem {
     Order tmp;
     for (int i = 0; i < res.size(); ++i) {
       ofile.seekg(head + res[i] * sizeof(Order));
-      ofile.read(reinterpret_cast<char*>(&tmp), sizeof(char) + 4 * sizeof(int));
+      ofile.read(reinterpret_cast<char*>(&tmp), sizeof(tmp));
       // 这一步应读入状态-火车编号-特征天数-两个站在这趟车上的位置
       if (tmp.to < order.from || tmp.from > order.to)
         continue;          // 没有影响
