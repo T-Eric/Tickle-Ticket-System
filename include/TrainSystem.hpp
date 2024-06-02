@@ -102,7 +102,7 @@ class TrainSystem {
   sjtu::BPTree<ID, int> trainIndex;
   sjtu::BPTree<String, Element<int, int> > stationIndex;
   std::fstream tfile;  // 存储真实数据，暂时不知道要不要给station也加一个
-  const string tfilename = "Data/TrainData.dat";
+  const string tfilename = "TrainData.dat";
 
   vector<int> res;
   vector<string> tokens;
@@ -152,7 +152,7 @@ class TrainSystem {
 
  public:
   explicit TrainSystem()
-      : trainIndex("Data/TrainIndex.dat"), stationIndex("Data/StationIndex.dat") {
+      : trainIndex("TrainIndex.dat"), stationIndex("StationIndex.dat") {
     tfile.open(tfilename, std::ios::in | std::ios::out | std::ios::binary);
     if (!tfile.is_open()) {
       tfile.open(tfilename, std::ios::out);
