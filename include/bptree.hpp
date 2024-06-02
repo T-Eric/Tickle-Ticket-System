@@ -18,638 +18,638 @@ template <class keyType, class valueType>
 struct Element {
   keyType key;
   valueType val;
-
   Element() = default;
-  Element(const keyType& k, const valueType& v);
-  Element(const Element& other);
-  Element& operator=(const Element& other);
-  ~Element() = default;
-  template <class K, class V>
-  friend bool operator==(const Element<K, V>& lhs, const Element<K, V>& rhs);
-  template <class K, class V>
-  friend bool operator<(const Element<K, V>& lhs, const Element<K, V>& rhs);
-  template <class K, class V>
-  friend bool operator<=(const Element<K, V>& lhs, const Element<K, V>& rhs);
+  Element(const keyType& t, const valueType& v) {
+    key = t;
+    val = v;
+  }
+  Element& operator=(const Element& x) {
+    if (this == &x)
+      return *this;
+    key = x.key;
+    val = x.val;
+    return *this;
+  }
 };
-
-const int MaxSize = 4096, MinSize = 1365;  // Max=3Min
-// const int MaxSize = 4, MinSize = 1;
-
 template <class keyType, class valueType>
-struct Node {
-  int isleaf = 0;
+bool operator==(const Element<keyType, valueType>& a, const Element<keyType, valueType>& b) {
+  if (!(a.key == b.key)) {
+    return false;
+  }
+  return a.val == b.val;
+}
+template <class keyType, class valueType>
+bool operator!=(const Element<keyType, valueType>& a, const Element<keyType, valueType>& b) {
+  return !(a == b);
+}
+template <class keyType, class valueType>
+bool operator<(const Element<keyType, valueType>& a, const Element<keyType, valueType>& b) {
+  if (!(a.key == b.key)) {
+    return (a.key < b.key);
+  }
+  return a.val < b.val;
+}
+template <class keyType, class valueType>
+bool operator>(const Element<keyType, valueType>& a, const Element<keyType, valueType>& b) {
+  if (!(a.key == b.key)) {
+    return !(a.key < b.key);
+  }
+  return a.val > b.val;
+}
+template <class keyType, class valueType>
+bool operator<=(const Element<keyType, valueType>& a, const Element<keyType, valueType>& b) {
+  return !(a > b);
+}
+template <class keyType, class valueType>
+bool operator>=(const Element<keyType, valueType>& a, const Element<keyType, valueType>& b) {
+  return !(a < b);
+}
+
+const int MaxSize = 1024, MinSize = 512;
+template <class keyType, class valueType>
+struct Block {
+  int isLeaf = 0;  // 是否是叶结点
   int siz = 0;
-  int nxt = -1;
-  ELEMENT_TYPE eles[MaxSize + 2];
-  // head_part
-  int chds[MaxSize + 3];  // 如果是叶节点，就指向data了
-  // 但这样就要搞data回收，恐怕十分困难吧
+  int nxt = -1;  // 如果它是叶结点，那么它的下一个块是谁（方便从底层遍历）
+  // 注意指针个数会比元素个数多一个
+  // 这里记录元素个数！！！！！
+  Element<keyType, valueType> ele[MaxSize + 2];
+  int chd[MaxSize + 3];  // 下属的块在哪个位置
 };
 
 template <class keyType, class valueType>
 class BPTree {
  private:
   int nowsize = -1;  // 最后一个块的位置
-  std::fstream file;
-  std::string filename;
-  int empty[1001];  // empty[0]就能存放栈高度了
+  std::fstream _file;
+  std::string _filename;
+  int recycle[5001];
+  void rdall(int pos, Block<keyType, valueType>& blk) {
+    if (pos < 0)
+      exit(-1);
+    _file.seekg(pos * sizeof(Block<keyType, valueType>) + sizeof(int) * 2 + sizeof(recycle));
+    _file.read(reinterpret_cast<char*>(&blk), sizeof(blk));
+  }
+  void wtall(int pos, const Block<keyType, valueType>& blk) {
+    if (pos < 0)
+      exit(-1);
+    _file.seekp(pos * sizeof(Block<keyType, valueType>) + sizeof(int) * 2 + sizeof(recycle));
+    _file.write(reinterpret_cast<const char*>(&blk), sizeof(blk));
+  }
+  void rdfirst(int pos, Block<keyType, valueType>& blk) {
+    if (pos < 0)
+      exit(-1);
+    _file.seekg(pos * sizeof(Block<keyType, valueType>) + sizeof(int) * 2 + sizeof(recycle));
+    _file.read(reinterpret_cast<char*>(&(blk.isLeaf)), sizeof(blk.isLeaf));
+    _file.read(reinterpret_cast<char*>(&(blk.siz)), sizeof(blk.siz));
+    _file.read(reinterpret_cast<char*>(&(blk.nxt)), sizeof(blk.nxt));
+    _file.read(reinterpret_cast<char*>(&(blk.ele)), sizeof(blk.ele));
+  }
+  void wtfirst(int pos, const Block<keyType, valueType>& blk) {
+    if (pos < 0)
+      exit(-1);
+    _file.seekp(pos * sizeof(Block<keyType, valueType>) + sizeof(int) * 2 + sizeof(recycle));
+    _file.write(reinterpret_cast<const char*>(&(blk.isLeaf)), sizeof(blk.isLeaf));
+    _file.write(reinterpret_cast<const char*>(&(blk.siz)), sizeof(blk.siz));
+    _file.write(reinterpret_cast<const char*>(&(blk.nxt)), sizeof(blk.nxt));
+    _file.write(reinterpret_cast<const char*>(&(blk.ele)), sizeof(blk.ele));
+  }
+  void rdsize(int pos, Block<keyType, valueType>& blk) {
+    if (pos < 0)
+      exit(-1);
+    _file.seekg(pos * sizeof(Block<keyType, valueType>) + sizeof(int) * 3 + sizeof(recycle));
+    _file.read(reinterpret_cast<char*>(&(blk.siz)), sizeof(blk.siz));
+  }
+  void wtsize(int pos, const Block<keyType, valueType>& blk) {
+    if (pos < 0)
+      exit(-1);
+    _file.seekp(pos * sizeof(Block<keyType, valueType>) + sizeof(int) * 3 + sizeof(recycle));
+    _file.write(reinterpret_cast<const char*>(&(blk.siz)), sizeof(blk.siz));
+  }
+
   int last = -1;
-  ELEMENT_TYPE pass;  // 中间的元素
-
-  void rd(int pos, NODE_TYPE& node);
-  void wt(int pos, NODE_TYPE& node);
-  void rdhead(int pos, NODE_TYPE& node);
-  void wthead(int pos, NODE_TYPE& node);
-  void rdsize(int pos, NODE_TYPE& node);
-  void wtsize(int pos, NODE_TYPE& node);
-
-  int GetPos();                  // 获取一个空白块
-  inline int LastPos() const;    // 求上一个
-  inline void Recycle(int pos);  // 扔到回收站
-
-  bool InternalInsert(NODE_TYPE& cur, int pos, const ELEMENT_TYPE& ele);
-  bool InternalRemove(NODE_TYPE& cur, int pos, const ELEMENT_TYPE& ele);
-
- public:
-  int root = -1;  // 根节点pos，必须第一时间获取
-  explicit BPTree(const std::string& name);
-  ~BPTree();
-
-  void Find(const keyType& key, sjtu::vector<valueType>& ans);
-  void Insert(const ELEMENT_TYPE& ele);
-  void Remove(const ELEMENT_TYPE& ele);
-  void Clear();
-  void BulkFind(const keyType& lkey, const keyType& rkey, sjtu::vector<ELEMENT_TYPE>& ans);
-};
-
-GENERAL_TEMPLATE
-ELEMENT_TYPE::Element(const keyType& k, const valueType& v) {
-  key = k;
-  val = v;
-}
-GENERAL_TEMPLATE
-ELEMENT_TYPE::Element(const Element& other) {
-  key = other.key;
-  val = other.val;
-}
-GENERAL_TEMPLATE
-ELEMENT_TYPE& ELEMENT_TYPE::operator=(const Element& other) {
-  if (this != &other) {
-    key = other.key;
-    val = other.val;
-  }
-  return *this;
-}
-GENERAL_TEMPLATE
-bool operator==(const ELEMENT_TYPE& lhs, const ELEMENT_TYPE& rhs) {
-  if (!(lhs.key == rhs.key))
-    return false;
-  return lhs.val == rhs.val;
-}
-GENERAL_TEMPLATE
-bool operator<(const ELEMENT_TYPE& lhs, const ELEMENT_TYPE& rhs) {
-  if (!(lhs.key == rhs.key))
-    return lhs.key < rhs.key;
-  return lhs.val < rhs.val;
-}
-GENERAL_TEMPLATE
-bool operator<=(const ELEMENT_TYPE& lhs, const ELEMENT_TYPE& rhs) {
-  return lhs == rhs || lhs < rhs;
-}
-
-GENERAL_TEMPLATE
-void TREE_TYPE::rd(int pos, NODE_TYPE& node) {
-  if (pos < 0)
-    throw;
-  file.seekg(pos * sizeof(NODE_TYPE) + sizeof(int) * 2 + sizeof(empty));
-  file.read(reinterpret_cast<char*>(&node), sizeof(node));
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::wt(int pos, NODE_TYPE& node) {
-  if (pos < 0)
-    throw;
-  file.seekp(pos * sizeof(NODE_TYPE) + sizeof(int) * 2 + sizeof(empty));
-  file.write(reinterpret_cast<const char*>(&node), sizeof(node));
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::rdhead(int pos, NODE_TYPE& node) {
-  if (pos < 0)
-    throw;
-  file.seekg(pos * sizeof(NODE_TYPE) + sizeof(int) * 2 + sizeof(empty));
-  file.read(reinterpret_cast<char*>(&(node.isleaf)), sizeof(node.isleaf));
-  file.read(reinterpret_cast<char*>(&(node.siz)), sizeof(node.siz));
-  file.read(reinterpret_cast<char*>(&(node.nxt)), sizeof(node.nxt));
-  file.read(reinterpret_cast<char*>(&(node.eles)), sizeof(node.eles));
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::wthead(int pos, NODE_TYPE& node) {
-  if (pos < 0)
-    throw;
-  file.seekp(pos * sizeof(NODE_TYPE) + sizeof(int) * 2 + sizeof(empty));
-  file.write(reinterpret_cast<const char*>(&(node.isleaf)), sizeof(node.isleaf));
-  file.write(reinterpret_cast<const char*>(&(node.siz)), sizeof(node.siz));
-  file.write(reinterpret_cast<const char*>(&(node.nxt)), sizeof(node.nxt));
-  file.write(reinterpret_cast<const char*>(&(node.eles)), sizeof(node.eles));
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::rdsize(int pos, NODE_TYPE& node) {
-  if (pos < 0)
-    throw;
-  file.seekg(pos * sizeof(NODE_TYPE) + sizeof(int) * 3 + sizeof(empty));
-  file.read(reinterpret_cast<char*>(&(node.siz)), sizeof(node.siz));
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::wtsize(int pos, NODE_TYPE& node) {
-  if (pos < 0)
-    throw;
-  file.seekp(pos * sizeof(NODE_TYPE) + sizeof(int) * 3 + sizeof(empty));
-  file.write(reinterpret_cast<const char*>(&(node.siz)), sizeof(node.siz));
-}
-
-GENERAL_TEMPLATE
-int TREE_TYPE::GetPos() {
-  if (empty[0]) {
-    int ret = empty[empty[0]--];
-    last = ret;  // 记录上一个last块
-    return ret;
-  }
-  last = ++nowsize;  // 为什么要++呢？
-  return nowsize;
-}
-GENERAL_TEMPLATE
-inline int TREE_TYPE::LastPos() const {
-  return last;
-}
-GENERAL_TEMPLATE
-inline void TREE_TYPE::Recycle(int pos) {
-  empty[++empty[0]] = pos;
-}
-
-GENERAL_TEMPLATE
-bool TREE_TYPE::InternalInsert(NODE_TYPE& cur, int pos, const ELEMENT_TYPE& ele) {
-  if (cur.isleaf) {
-    int l = 0, r = cur.siz, mid;
-    while (l < r) {
-      mid = (l + r) >> 1;
-      if (ele < cur.eles[mid])
-        r = mid;
-      else
-        l = mid + 1;
+  int GetPos() {
+    if (recycle[0]) {
+      int ret = recycle[recycle[0]--];
+      last = ret;
+      return ret;
     }
-    if (l > 0 && cur.eles[l - 1] == ele)
-      return false;  // 相同元素
+    last = (++nowsize);
+    return nowsize;
+  }
+  inline int LastPos() {
+    return last;
+  }
+  inline void Recycle(int num) {
+    recycle[++recycle[0]] = num;
+  }
 
-    for (int i = cur.siz - 1; i >= l; --i)
-      cur.eles[i + 1] = cur.eles[i];
-    cur.eles[l] = ele;  // 先插入
-    ++cur.siz;
-    if (cur.siz <= MaxSize) {
-      wthead(pos, cur);
-      return false;  // 没有裂块，不必调整
-    }
-    // 裂块
-    else {
+  Element<keyType, valueType> pass;
+  bool InternalInsert(Block<keyType, valueType>& cur, int pos, const Element<keyType, valueType>& ele) {
+    // 注意比最后一个元素大要不要特判
+    if (cur.isLeaf) {
+      int l = 0, r = cur.siz;
+      while (l < r) {
+        int mid = (l + r) >> 1;
+        if (cur.ele[mid] > ele) {
+          r = mid;
+        } else {
+          l = mid + 1;
+        }
+      }
+      if (l > 0 && cur.ele[l - 1] == ele) {
+        // 插入失败
+        return false;
+      }
+      // 插在 l 处
+      if (cur.siz < MaxSize) {
+        for (int i = cur.siz - 1; i >= l; --i) {
+          cur.ele[i + 1] = cur.ele[i];
+        }
+        ++cur.siz;
+        cur.ele[l] = ele;
+        wtfirst(pos, cur);
+        // 可不可能出现要调整头顶上值的情况？
+        // 貌似不会
+        return false;  // 不调整
+      }
+
+      // 裂开！
+      for (int i = cur.siz - 1; i >= l; --i) {
+        cur.ele[i + 1] = cur.ele[i];
+      }
+      ++cur.siz;
+      cur.ele[l] = ele;
       int newpos = GetPos();
-      static NODE_TYPE node;               // 常驻新node
-      int rightsize = (MaxSize >> 1) + 1;  // 裂成相同大小的块就得
-      // rightsize=257，cur.siz=513
-      node.isleaf = true;
-      node.siz = rightsize;
-      node.nxt = cur.nxt;
+      static Block<keyType, valueType> blk;
+      blk.isLeaf = true;
+      blk.siz = MinSize + 1;
+      blk.nxt = cur.nxt;
       cur.nxt = newpos;
-      for (int i = 0; i < rightsize; ++i)
-        node.eles[i] = cur.eles[i + rightsize - 1];
-      // 假如根节点要裂开
+      for (int i = 0; i <= MinSize; ++i) {
+        blk.ele[i] = cur.ele[i + MinSize];
+      }
+      cur.siz = MinSize;
       if (root == pos) {
-        // 建立新的根节点
-        static NODE_TYPE newroot;
-        newroot.isleaf = false;
+        static Block<keyType, valueType> newroot;
+        newroot.isLeaf = false;
         newroot.siz = 1;
-        newroot.eles[0] = cur.eles[rightsize - 1];
-        newroot.chds[0] = pos;
-        newroot.chds[1] = newpos;
-        wthead(pos, cur);
-        wthead(newpos, node);
+        newroot.ele[0] = cur.ele[MinSize];
+        newroot.chd[0] = pos;
+        newroot.chd[1] = newpos;
+        wtfirst(pos, cur);
+        wtfirst(newpos, blk);
         int rootpos = GetPos();
-        wt(rootpos, newroot);
+        wtall(rootpos, newroot);
         root = rootpos;
         return false;
       }
-      wt(pos, cur);
-      wt(newpos, node);
-      pass = node.eles[0];  // 上传的新节点值
-      return true;
+      wtall(pos, cur);
+      wtall(newpos, blk);
+      pass = blk.ele[0];
+      return true;  // 调整
     }
-  }
-  // 内部节点
-  int l = 0, r = cur.siz, mid;
-  while (l < r) {
-    mid = (l + r) >> 1;
-    if (ele <= cur.eles[mid])
-      r = mid;
-    else
-      l = mid + 1;
-  }
-  if (l < cur.siz && cur.eles[l] == ele)
-    ++l;
-  NODE_TYPE child;
-  rd(cur.chds[l], child);
-  // 递归插入
-  bool state = InternalInsert(child, cur.chds[l], ele);
-  if (!state)
-    return false;  // 不调整
 
-  for (int i = cur.siz - 1; i >= l; --i) {
-    cur.eles[i + 1] = cur.eles[i];
-    cur.chds[i + 2] = cur.chds[i + 1];
-  }
-  ++cur.siz;
-  cur.eles[l] = pass;
-  cur.chds[l + 1] = LastPos();
-  if (cur.siz <= MaxSize) {
-    wt(pos, cur);
-    return false;
-  }
-  int newpos = GetPos(), rightsize = (MaxSize >> 1) + 1;
-  pass = cur.eles[rightsize - 1];
-  static NODE_TYPE node;
-  node.isleaf = false;
-  node.siz = rightsize;
-  for (int i = 0; i < rightsize - 1; ++i) {
-    node.eles[i] = cur.eles[i + rightsize];
-    node.chds[i] = cur.chds[i + rightsize];
-  }
-  node.chds[rightsize - 1] = cur.chds[cur.siz];
-  cur.siz = rightsize - 1;
-  if (root == pos) {
-    static NODE_TYPE newroot;
-    newroot.isleaf = false;
-    newroot.siz = 1;
-    newroot.eles[0] = pass;
-    newroot.chds[0] = pos;
-    newroot.chds[1] = newpos;
-    wt(pos, cur);
-    wt(newpos, node);
-    int rootpos = GetPos();
-    wt(rootpos, newroot);
-    root = rootpos;
-    return false;
-  }
-  wt(pos, cur);
-  wt(newpos, node);
-  return true;
-}
-GENERAL_TEMPLATE
-bool TREE_TYPE::InternalRemove(NODE_TYPE& cur, int pos, const ELEMENT_TYPE& ele) {
-  if (cur.isleaf) {
-    int l = 0, r = cur.siz, mid;
-    while (l < r) {
-      mid = (l + r) >> 1;
-      if (ele < cur.eles[mid])
-        r = mid;
-      else
-        l = mid + 1;
-    }
-    --l;
-    if (l < 0 || l >= cur.siz || !(cur.eles[l] == ele))
-      return false;
-    for (int i = l + 1; i < cur.siz; ++i)
-      cur.eles[i - 1] = cur.eles[i];
-    --cur.siz;
-    if (pos == root)
-      wt(pos, cur);
-    wthead(pos, cur);
-    if (cur.siz < MinSize)
-      return true;
-    return false;
-  }
-  int l = 0, r = cur.siz;
-  while (l < r) {
-    int mid = (l + r) >> 1;
-    if (ele <= cur.eles[mid]) {
-      r = mid;
-    } else {
-      l = mid + 1;
-    }
-  }
-  if (l < cur.siz && ele == cur.eles[l])
-    ++l;
-  NODE_TYPE child;
-  rd(cur.chds[l], child);
-  bool state = InternalRemove(child, cur.chds[l], ele);
-  if (!state)
-    return false;
-  // 特判根！如果根的孩子要并块且并完只剩一个块，那么这个根消灭
-  if (pos == root && cur.siz == 1) {
-    static NODE_TYPE node[2];
-    rdsize(cur.chds[0], node[0]);
-    rdsize(cur.chds[1], node[1]);
-    if (node[0].siz + node[1].siz < MaxSize) {
-      rd(cur.chds[0], node[0]);
-      rd(cur.chds[1], node[1]);
-      Recycle(cur.chds[1]);
-      Recycle(root);
-      if (node[0].isleaf) {
-        for (int i = 0; i < node[1].siz; ++i)
-          node[0].eles[i + node[0].siz] = node[1].eles[i];
-        node[0].siz += node[1].siz;
-        node[0].nxt = node[1].nxt;
-        root = cur.chds[0];
-        wthead(cur.chds[0], node[0]);
-        return false;
-      }
-      for (int i = 0; i < node[1].siz; ++i) {
-        node[0].eles[i + node[0].siz + 1] = node[1].eles[i];
-        node[0].chds[i + node[0].siz + 1] = node[1].chds[i];
-      }
-      node[0].chds[node[0].siz + node[1].siz + 1] = node[1].chds[node[1].siz];
-      node[0].eles[node[0].siz] = cur.eles[0];
-      node[0].siz += node[1].siz + 1;
-      root = cur.chds[0];
-      wt(cur.chds[0], node[0]);
-      return false;
-    }
-  }
-  if (l > 0) {
-    // 考虑和左边借元素或者合并
-    static NODE_TYPE node;
-    rdsize(cur.chds[l - 1], node);
-    if (node.siz > MinSize) {
-      if (child.isleaf) {
-        rdhead(cur.chds[l - 1], node);
-        for (int i = child.siz - 1; i >= 0; --i)
-          child.eles[i + 1] = child.eles[i];
-        child.eles[0] = node.eles[node.siz - 1];
-        ++child.siz;
-        --node.siz;
-        cur.eles[l - 1] = child.eles[0];
-        wt(pos, cur);
-        wtsize(cur.chds[l - 1], node);
-        wthead(cur.chds[l], child);
-        return false;
-      }
-      rd(cur.chds[l - 1], node);
-      for (int i = child.siz; i >= 1; --i) {
-        child.eles[i] = child.eles[i - 1];
-        child.chds[i + 1] = child.chds[i];
-      }
-      child.chds[1] = child.chds[0];
-      child.eles[0] = cur.eles[l - 1];
-      child.chds[0] = node.chds[node.siz];
-      ++child.siz;
-      cur.eles[l - 1] = node.eles[node.siz - 1];
-      --node.siz;
-      wt(pos, cur);
-      wtsize(cur.chds[l - 1], node);
-      wt(cur.chds[l], child);
-      return false;
-    }
-    // 和左边合并
-    if (child.isleaf) {
-      rdhead(cur.chds[l - 1], node);
-      Recycle(cur.chds[l - 1]);
-      for (int i = 0; i < child.siz; ++i)
-        node.eles[i + node.siz] = child.eles[i];
-      node.siz += child.siz;
-      node.nxt = child.nxt;
-      for (int i = l; i < cur.siz; ++i) {
-        cur.eles[i - 1] = cur.eles[i];
-        cur.chds[i] = cur.chds[i + 1];
-      }
-      --cur.siz;
-      wt(cur.chds[l - 1], node);
-      wthead(cur.chds[l - 1], node);
-      if (cur.siz < MinSize)
-        return true;
-      return false;
-    }
-    rd(cur.chds[l - 1], node);
-    Recycle(cur.chds[l]);
-    for (int i = 0; i < child.siz; ++i) {
-      node.eles[i + node.siz + 1] = child.eles[i];
-      node.chds[i + node.siz + 1] = child.chds[i];
-    }
-    node.chds[node.siz + child.siz + 1] = child.chds[child.siz];
-    node.eles[node.siz] = cur.eles[l - 1];
-    node.siz += child.siz + 1;
-    for (int i = l; i < cur.siz; ++i) {
-      cur.eles[i - 1] = cur.eles[i];
-      cur.chds[i] = cur.chds[i + 1];
-    }
-    --cur.siz;
-    wt(pos, cur);
-    wt(cur.chds[l - 1], node);
-    if (cur.siz < MinSize)
-      return true;
-    return false;
-  } else if (l < cur.siz) {
-    // 右边借/并
-    static NODE_TYPE node;
-    rdsize(cur.chds[l + 1], node);
-    if (node.siz > MinSize) {
-      if (child.isleaf) {
-        rdhead(cur.chds[l + 1], node);
-        child.eles[child.siz] = node.eles[0];
-        ++child.siz;
-        for (int i = 0; i < node.siz - 1; ++i)
-          node.eles[i] = node.eles[i + 1];
-        --node.siz;
-        cur.eles[l] = node.eles[0];
-        wt(pos, cur);
-        wthead(cur.chds[l + 1], node);
-        wthead(cur.chds[l + 1], node);
-        return false;
-      }
-      rd(cur.chds[l + 1], node);
-      child.eles[child.siz] = cur.eles[l];
-      child.chds[child.siz + 1] = node.chds[0];
-      ++child.siz;
-      cur.eles[l] = node.eles[0];
-      for (int i = 0; i < node.siz - 1; ++i) {
-        node.eles[i] = node.eles[i + 1];
-        node.chds[i] = node.chds[i + 1];
-      }
-      node.chds[node.siz - 1] = node.chds[node.siz];
-      --node.siz;
-      wt(pos, cur);
-      wt(cur.chds[l], child);
-      wt(cur.chds[l + 1], node);
-      return false;
-    }
-    // 右合并
-    if (child.isleaf) {
-      rdhead(cur.chds[l + 1], node);
-      Recycle(cur.chds[l + 1]);
-      for (int i = 0; i < node.siz; ++i)
-        child.eles[i + child.siz] = node.eles[i];
-      child.siz += node.siz;
-      child.nxt = node.nxt;
-      for (int i = l + 1; i < cur.siz; ++i) {
-        cur.eles[i - 1] = cur.eles[i];
-        cur.chds[i] = cur.chds[i + 1];
-      }
-      --cur.siz;
-      wt(pos, cur);
-      wt(cur.chds[l], child);
-      if (cur.siz < MinSize)
-        return true;
-      return false;
-    }
-    rd(cur.chds[l + 1], node);
-    ;
-    Recycle(cur.chds[l + 1]);
-    for (int i = 0; i < node.siz; ++i) {
-      child.eles[i + child.siz + 1] = node.eles[i];
-      child.chds[i + child.siz + 1] = node.chds[i];
-    }
-    child.chds[child.siz + node.siz + 1] = node.chds[node.siz];
-    child.eles[child.siz] = cur.eles[l];
-    child.siz += node.siz + 1;
-    for (int i = l; i < cur.siz - 1; ++i) {
-      cur.eles[i] = cur.eles[i + 1];
-      cur.chds[i + 1] = cur.chds[i + 2];
-    }
-    --cur.siz;
-    wt(pos, cur);
-    wt(cur.chds[l], child);
-    if (cur.siz < MinSize)
-      return true;
-    return false;
-  } else
-    throw;
-}
-
-GENERAL_TEMPLATE
-TREE_TYPE::BPTree(const std::string& name) {
-  filename = name;
-  file.open(filename);
-  if (!file.is_open()) {
-    file.open(filename, std::fstream::out);
-    file.close();
-    file.open(filename, std::fstream::in | std::fstream::out);
-    nowsize = -1;
-    file.seekp(0);
-    file.write(reinterpret_cast<const char*>(&nowsize), sizeof(nowsize));
-    root = -1;
-    file.write(reinterpret_cast<const char*>(&root), sizeof(root));
-    empty[0] = 0;
-    file.write(reinterpret_cast<const char*>(&empty), sizeof(empty));
-    static NODE_TYPE tmpnode;
-    file.write(reinterpret_cast<const char*>(&tmpnode), sizeof(tmpnode));
-  } else {
-    file.seekg(0);
-    file.read(reinterpret_cast<char*>(&nowsize), sizeof(nowsize));
-    file.read(reinterpret_cast<char*>(&root), sizeof(root));
-    file.read(reinterpret_cast<char*>(&empty), sizeof(empty));
-  }
-}
-GENERAL_TEMPLATE
-TREE_TYPE::~BPTree() {
-  file.seekp(0);
-  file.write(reinterpret_cast<const char*>(&nowsize), sizeof(nowsize));
-  file.write(reinterpret_cast<const char*>(&root), sizeof(root));
-  file.write(reinterpret_cast<const char*>(&empty), sizeof(empty));
-  file.close();
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::Find(const keyType& key, sjtu::vector<valueType>& ans) {
-  ans.clear();
-  if (root == -1)
-    return;
-  static NODE_TYPE cur;
-  cur.isleaf = false;
-  int pos = root, mid;
-  while (true) {
-    rd(pos, cur);
-    if (cur.isleaf)
-      break;
+    // 不是叶子
     int l = 0, r = cur.siz;
     while (l < r) {
-      mid = (l + r) >> 1;
-      if (key <= cur.eles[mid].key)
+      int mid = (l + r) >> 1;
+      if (cur.ele[mid] >= ele) {
         r = mid;
-      else
+      } else {
         l = mid + 1;
+      }
     }
-    pos = cur.chds[l];
+    if (l < cur.siz && cur.ele[l] == ele) {
+      ++l;
+    }
+    // 就是 l
+    Block<keyType, valueType> child;
+    rdall(cur.chd[l], child);
+    bool state = InternalInsert(child, cur.chd[l], ele);
+    if (!state)
+      return false;
+
+    if (cur.siz < MaxSize) {
+      for (int i = cur.siz - 1; i >= l; --i) {
+        cur.ele[i + 1] = cur.ele[i];
+        cur.chd[i + 2] = cur.chd[i + 1];
+      }
+      ++cur.siz;
+      cur.ele[l] = pass;
+      cur.chd[l + 1] = LastPos();
+      wtall(pos, cur);
+      return false;
+    }
+    // 继续裂块
+    for (int i = cur.siz - 1; i >= l; --i) {
+      cur.ele[i + 1] = cur.ele[i];
+      cur.chd[i + 2] = cur.chd[i + 1];
+    }
+    ++cur.siz;
+    cur.ele[l] = pass;
+    cur.chd[l + 1] = LastPos();
+    int newpos = GetPos();
+    pass = cur.ele[MinSize];
+    static Block<keyType, valueType> blk;
+    blk.isLeaf = false;
+    blk.siz = MinSize;
+    for (int i = 0; i < MinSize; ++i) {
+      blk.ele[i] = cur.ele[i + MinSize + 1];
+      blk.chd[i] = cur.chd[i + MinSize + 1];
+    }
+    blk.chd[MinSize] = cur.chd[cur.siz];
+    cur.siz = MinSize;
+    if (root == pos) {
+      // 裂根
+      static Block<keyType, valueType> newroot;
+      newroot.isLeaf = false;
+      newroot.siz = 1;
+      newroot.ele[0] = pass;
+      newroot.chd[0] = pos;
+      newroot.chd[1] = newpos;
+      wtall(pos, cur);
+      wtall(newpos, blk);
+      int rootpos = GetPos();
+      wtall(rootpos, newroot);
+      root = rootpos;
+      return false;
+    }
+    wtall(pos, cur);
+    wtall(newpos, blk);
+    return true;
   }
-  int l = 0, r = cur.siz;
-  while (l < r) {
-    mid = (l + r) >> 1;
-    if (key <= cur.eles[mid].key)
-      r = mid;
-    else
-      l = mid + 1;
+
+  bool InternalRemove(Block<keyType, valueType>& cur, int pos, const Element<keyType, valueType>& ele) {
+    if (cur.isLeaf) {
+      int l = 0, r = cur.siz;
+      while (l < r) {
+        int mid = (l + r) >> 1;
+        if (cur.ele[mid] > ele) {
+          r = mid;
+        } else {
+          l = mid + 1;
+        }
+      }
+      --l;
+      if (l < 0 || l >= cur.siz || cur.ele[l] != ele) {
+        return false;
+      }
+      for (int i = l + 1; i < cur.siz; ++i) {
+        cur.ele[i - 1] = cur.ele[i];
+      }
+      --cur.siz;
+      if (pos == root) {
+        wtall(pos, cur);
+      }
+      wtfirst(pos, cur);
+      if (cur.siz < MinSize) {
+        return true;  // 并块
+      }
+      // 不用操作
+      return false;
+    }
+
+    // 不是叶子
+    int l = 0, r = cur.siz;
+    while (l < r) {
+      int mid = (l + r) >> 1;
+      if (cur.ele[mid] >= ele) {
+        r = mid;
+      } else {
+        l = mid + 1;
+      }
+    }
+    if (l < cur.siz && ele == cur.ele[l]) {
+      // 刚好碰到，证明是右边的
+      ++l;
+    }
+    // 就是 l
+    Block<keyType, valueType> child;
+    rdall(cur.chd[l], child);
+    bool state = InternalRemove(child, cur.chd[l], ele);
+    if (!state)
+      return false;
+
+    // 并块！此时 child 已经删掉了一个元素，考虑跟相邻两个元素之一合并
+    // 合并
+    // 特判根！如果根的孩子要并块且并完只剩一个块，那么这个根消灭
+    if (pos == root && cur.siz == 1) {
+      static Block<keyType, valueType> blk[2];
+      rdsize(cur.chd[0], blk[0]);
+      rdsize(cur.chd[1], blk[1]);
+      if (blk[0].siz + blk[1].siz < MaxSize) {
+        // 并块！
+        rdall(cur.chd[0], blk[0]);
+        rdall(cur.chd[1], blk[1]);
+        Recycle(cur.chd[1]);
+        Recycle(root);
+        if (blk[0].isLeaf) {
+          for (int i = 0; i < blk[1].siz; ++i) {
+            blk[0].ele[i + blk[0].siz] = blk[1].ele[i];
+          }
+          blk[0].siz += blk[1].siz;
+          blk[0].nxt = blk[1].nxt;
+          root = cur.chd[0];
+          wtfirst(cur.chd[0], blk[0]);
+          return false;
+        }
+        for (int i = 0; i < blk[1].siz; ++i) {
+          blk[0].ele[i + blk[0].siz + 1] = blk[1].ele[i];
+          blk[0].chd[i + blk[0].siz + 1] = blk[1].chd[i];
+        }
+        blk[0].chd[blk[0].siz + blk[1].siz + 1] = blk[1].chd[blk[1].siz];
+        blk[0].ele[blk[0].siz] = cur.ele[0];
+        blk[0].siz += blk[1].siz + 1;
+        root = cur.chd[0];
+        wtall(cur.chd[0], blk[0]);
+        return false;
+      }
+    }
+    if (l > 0) {
+      // 考虑和左边借元素 / 合并
+      static Block<keyType, valueType> blk;
+      rdsize(cur.chd[l - 1], blk);
+      if (blk.siz > MinSize) {
+        // 从左边借一个
+        if (child.isLeaf) {
+          rdfirst(cur.chd[l - 1], blk);
+          for (int i = child.siz - 1; i >= 0; --i) {
+            child.ele[i + 1] = child.ele[i];
+          }
+          child.ele[0] = blk.ele[blk.siz - 1];
+          ++child.siz;
+          --blk.siz;
+          cur.ele[l - 1] = child.ele[0];
+          wtall(pos, cur);
+          wtsize(cur.chd[l - 1], blk);
+          wtfirst(cur.chd[l], child);
+          return false;
+        }
+        rdall(cur.chd[l - 1], blk);
+        for (int i = child.siz; i >= 1; --i) {
+          child.ele[i] = child.ele[i - 1];
+          child.chd[i + 1] = child.chd[i];
+        }
+        child.chd[1] = child.chd[0];
+        ++child.siz;
+        child.ele[0] = cur.ele[l - 1];
+        child.chd[0] = blk.chd[blk.siz];
+        cur.ele[l - 1] = blk.ele[blk.siz - 1];
+        --blk.siz;
+        wtall(pos, cur);
+        wtsize(cur.chd[l - 1], blk);
+        wtall(cur.chd[l], child);
+        return false;
+      }
+      // 和左边合并
+      if (child.isLeaf) {
+        rdfirst(cur.chd[l - 1], blk);
+        Recycle(cur.chd[l]);
+        for (int i = 0; i < child.siz; ++i) {
+          blk.ele[i + blk.siz] = child.ele[i];
+        }
+        blk.siz += child.siz;
+        blk.nxt = child.nxt;
+        for (int i = l; i < cur.siz; ++i) {
+          cur.ele[i - 1] = cur.ele[i];
+          cur.chd[i] = cur.chd[i + 1];
+        }
+        --cur.siz;
+        blk.nxt = child.nxt;
+        wtall(pos, cur);
+        wtfirst(cur.chd[l - 1], blk);
+        if (cur.siz < MinSize)
+          return true;
+        return false;
+      }
+      rdall(cur.chd[l - 1], blk);
+      Recycle(cur.chd[l]);
+      for (int i = 0; i < child.siz; ++i) {
+        blk.ele[i + blk.siz + 1] = child.ele[i];
+        blk.chd[i + blk.siz + 1] = child.chd[i];
+      }
+      blk.chd[blk.siz + child.siz + 1] = child.chd[child.siz];
+      blk.ele[blk.siz] = cur.ele[l - 1];
+      blk.siz += child.siz + 1;
+      for (int i = l - 1; i < cur.siz - 1; ++i) {
+        cur.ele[i] = cur.ele[i + 1];
+        cur.chd[i + 1] = cur.chd[i + 2];
+      }
+      --cur.siz;
+      wtall(pos, cur);
+      wtall(cur.chd[l - 1], blk);
+      if (cur.siz < MinSize)
+        return true;
+      return false;
+    } else if (l < cur.siz) {
+      // 和右边借元素 / 合并
+      static Block<keyType, valueType> blk;
+      rdsize(cur.chd[l + 1], blk);
+      if (blk.siz > MinSize) {
+        // 从右边借一个
+        if (child.isLeaf) {
+          rdfirst(cur.chd[l + 1], blk);
+          child.ele[child.siz] = blk.ele[0];
+          ++child.siz;
+          for (int i = 0; i < blk.siz - 1; ++i) {
+            blk.ele[i] = blk.ele[i + 1];
+          }
+          --blk.siz;
+          cur.ele[l] = blk.ele[0];
+          wtall(pos, cur);
+          wtfirst(cur.chd[l], child);
+          wtfirst(cur.chd[l + 1], blk);
+          return false;
+        }
+        rdall(cur.chd[l + 1], blk);
+        child.ele[child.siz] = cur.ele[l];
+        child.chd[child.siz + 1] = blk.chd[0];
+        ++child.siz;
+        cur.ele[l] = blk.ele[0];
+        for (int i = 0; i < blk.siz - 1; ++i) {
+          blk.ele[i] = blk.ele[i + 1];
+          blk.chd[i] = blk.chd[i + 1];
+        }
+        blk.chd[blk.siz - 1] = blk.chd[blk.siz];
+        --blk.siz;
+        wtall(pos, cur);
+        wtall(cur.chd[l], child);
+        wtall(cur.chd[l + 1], blk);
+        return false;
+      }
+      // 和右边合并
+      if (child.isLeaf) {
+        rdfirst(cur.chd[l + 1], blk);
+        Recycle(cur.chd[l + 1]);
+        for (int i = 0; i < blk.siz; ++i) {
+          child.ele[i + child.siz] = blk.ele[i];
+        }
+        child.siz += blk.siz;
+        child.nxt = blk.nxt;
+        for (int i = l; i < cur.siz - 1; ++i) {
+          cur.ele[i] = cur.ele[i + 1];
+          cur.chd[i + 1] = cur.chd[i + 2];
+        }
+        --cur.siz;
+        child.nxt = blk.nxt;
+        wtall(pos, cur);
+        wtfirst(cur.chd[l], child);
+        if (cur.siz < MinSize)
+          return true;
+        return false;
+      }
+      rdall(cur.chd[l + 1], blk);
+      Recycle(cur.chd[l + 1]);
+      for (int i = 0; i < blk.siz; ++i) {
+        child.ele[i + child.siz + 1] = blk.ele[i];
+        child.chd[i + child.siz + 1] = blk.chd[i];
+      }
+      child.chd[child.siz + blk.siz + 1] = blk.chd[blk.siz];
+      child.ele[child.siz] = cur.ele[l];
+      child.siz += blk.siz + 1;
+      for (int i = l; i < cur.siz - 1; ++i) {
+        cur.ele[i] = cur.ele[i + 1];
+        cur.chd[i + 1] = cur.chd[i + 2];
+      }
+      --cur.siz;
+      wtall(pos, cur);
+      wtall(cur.chd[l], child);
+      if (cur.siz < MinSize)
+        return true;
+      return false;
+    } else {
+      exit(1);
+    }
   }
-  if (l > 0)
-    --l;
-  if (l < cur.siz && key < cur.eles[l].key)
-    return;
-  bool flag = false;
-  while (true) {
-    for (int i = l; i < cur.siz; ++i) {
-      if (key < cur.eles[i].key) {
-        flag = true;
+
+ public:
+  int root = -1;
+  BPTree() = default;
+  explicit BPTree(const std::string& name) {
+    _filename = name;
+    _file.open(_filename);
+    if (!_file) {
+      // 文件不存在，创建新文件
+      _file.open(_filename, std::fstream::out);
+      _file.close();
+      _file.open(_filename);
+      nowsize = -1;
+      _file.seekp(0);
+      _file.write(reinterpret_cast<const char*>(&nowsize), sizeof(nowsize));
+      root = -1;
+      _file.write(reinterpret_cast<const char*>(&root), sizeof(root));
+      recycle[0] = 0;
+      _file.write(reinterpret_cast<const char*>(&recycle), sizeof(recycle));
+      static Block<keyType, valueType> tmp;
+      _file.write(reinterpret_cast<const char*>(&tmp), sizeof(tmp));
+    } else {
+      _file.seekg(0);
+      _file.read(reinterpret_cast<char*>(&nowsize), sizeof(nowsize));
+      _file.read(reinterpret_cast<char*>(&root), sizeof(root));
+      _file.read(reinterpret_cast<char*>(&recycle), sizeof(recycle));
+    }
+  }
+  ~BPTree() {
+    _file.seekp(0);
+    _file.write(reinterpret_cast<const char*>(&nowsize), sizeof(nowsize));
+    _file.write(reinterpret_cast<const char*>(&root), sizeof(root));
+    _file.write(reinterpret_cast<const char*>(&recycle), sizeof(recycle));
+    _file.close();
+  }
+
+  void Find(const keyType& key, vector<valueType>& res) {
+    res.clear();
+    if (root == -1)
+      return;
+
+    static Block<keyType, valueType> cur;
+    cur.isLeaf = false;
+    int pos = root;
+    while (true) {
+      rdall(pos, cur);
+      if (cur.isLeaf) {
         break;
       }
-      if (key == cur.eles[i].key)
-        ans.push_back(cur.eles[i].val);
+      // 二分
+      int l = 0, r = cur.siz;
+      while (l < r) {
+        int mid = (l + r) >> 1;
+        if (key <= cur.ele[mid].key) {
+          r = mid;
+        } else {
+          l = mid + 1;
+        }
+      }
+      // 就是 l
+      pos = cur.chd[l];
     }
-    if (flag)
-      break;
-    pos = cur.nxt;
-    if (pos == -1)
-      break;
-    rdhead(pos, cur);
-    l = 0;
+
+    int l = 0, r = cur.siz;
+    while (l < r) {
+      int mid = (l + r) >> 1;
+      if (key <= cur.ele[mid].key) {
+        r = mid;
+      } else {
+        l = mid + 1;
+      }
+    }
+    if (l > 0)
+      --l;
+    // l 为第一个可能值
+    if (l < cur.siz && key < cur.ele[l].key)
+      return;
+
+    bool flag = false;
+    while (true) {
+      for (int i = l; i < cur.siz; ++i) {
+        if (key < cur.ele[i].key) {
+          flag = true;
+          break;
+        }
+        if (key == cur.ele[i].key)
+          res.push_back(cur.ele[i].val);
+      }
+      if (flag)
+        break;
+      pos = cur.nxt;
+      if (pos == -1)
+        break;
+      rdfirst(pos, cur);
+      l = 0;
+    }
   }
-  return;
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::Insert(const ELEMENT_TYPE& ele) {
-  if (root == -1) {
-    root = nowsize = 0;
-    static NODE_TYPE cur;
-    cur.siz = 1;
-    cur.eles[0] = ele;
-    cur.isleaf = true;
-    cur.nxt = -1;
-    wthead(nowsize, cur);
-    return;
+
+  void Insert(const Element<keyType, valueType>& ele) {
+    if (root == -1) {
+      root = nowsize = 0;
+      static Block<keyType, valueType> cur;
+      cur.siz = 1;
+      cur.ele[0] = ele;
+      cur.isLeaf = true;
+      cur.nxt = -1;
+      wtfirst(nowsize, cur);
+      return;
+    }
+    Block<keyType, valueType> cur;
+    rdall(root, cur);
+    InternalInsert(cur, root, ele);
   }
-  NODE_TYPE cur;
-  rd(root, cur);
-  InternalInsert(cur, root, ele);
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::Remove(const ELEMENT_TYPE& ele) {
-  if (root == -1)
-    return;
-  static NODE_TYPE cur;
-  rd(root, cur);
-  InternalRemove(cur, root, ele);
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::Clear() {
-  if (std::filesystem::exists(filename))
-    std::filesystem::remove(filename);
-  file.open(filename, std::fstream::out);
-  file.close();
-  file.open(filename, std::fstream::in | std::fstream::out);
-  nowsize = -1;
-  file.seekp(0);
-  file.write(reinterpret_cast<const char*>(&nowsize), sizeof(nowsize));
-  root = -1;
-  file.write(reinterpret_cast<const char*>(&root), sizeof(root));
-  empty[0] = 0;
-  file.write(reinterpret_cast<const char*>(&empty), sizeof(empty));
-  static NODE_TYPE tmpnode;
-  file.write(reinterpret_cast<const char*>(&tmpnode), sizeof(tmpnode));
-}
-GENERAL_TEMPLATE
-void TREE_TYPE::BulkFind(const keyType& lkey, const keyType& rkey, sjtu::vector<ELEMENT_TYPE>& ans) {
-  return;
-}
+
+  void Remove(const Element<keyType, valueType>& ele) {
+    if (root == -1)
+      return;
+    static Block<keyType, valueType> cur;
+    rdall(root, cur);
+    InternalRemove(cur, root, ele);
+  }
+
+  void Clear() {
+    nowsize = -1;
+    root = -1;
+    recycle[0] = 0;
+  }
+};
 
 }  // namespace sjtu
 
