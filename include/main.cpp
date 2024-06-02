@@ -13,8 +13,8 @@ using sjtu::SplitString;
 // 直接把parser写在这里算了
 
 int main() {
-  freopen64("in.in", "r", stdin);
-  freopen64("out.out", "w", stdout);
+  //freopen64("in.in", "r", stdin);
+  //freopen64("out.out", "w", stdout);
   std::ios::sync_with_stdio(false);
   cin.tie(nullptr);
   cout.tie(nullptr);
